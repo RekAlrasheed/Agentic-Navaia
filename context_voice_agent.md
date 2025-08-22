@@ -1,27 +1,149 @@
 # Voice Agent – Context, Status, and Requirements
 
-Last updated: 2025-08-22 (logging + real flow enabled by default)
+Last updated: 2025-08-22 (GitHub repo created, develop branch active)
 
 ## Purpose
-Single source of truth for the voice agent work: goals, current status, what’s done, what’s broken, how to test, and what’s next.
+Single source of truth for the voice agent work: goals, current status, what's done, what's broken, how to test, and what's next.
 
 ## High-level goals / requirements
-- Voice session lifecycle
-  - Create session (backend) and return a session_id
-  - Retrieve session by id
-  - End session
-- ElevenLabs integration
-  - Start conversation with agent (support/sales)
-  - End conversation
-  - Webhook HMAC validation (planned)
-- Frontend
-  - Playground page to start/stop sessions and interact with agent
-  - Clear status: idle, connecting, connected, speaking, listening, error
-- Reliability & DX
-  - Consistent local dev start (Next on :3000, backend on :8000)
-  - Helpful error messages (frontend and Next API)
-  - Minimal configuration: .env.local for ElevenLabs and URLs
-  - Persistent logfile with diagnostics for ElevenLabs integration
+- Voice session lifecycle with comprehensive call management
+- ElevenLabs ConvAI integration with real-time voice conversations
+- Post-call analytics and action item extraction
+- Call history and summary management
+- Ticket creation and appointment scheduling from calls
+- Chat interface alongside voice functionality
+
+## Architecture (current)
+- Frontend: Next.js 14 (App Router) with @elevenlabs/react SDK
+  - Voice Integration: WebSocket-based real-time communication
+  - API routes for session management and health monitoring
+  - React hooks for voice agent state management
+  - Playground interface for testing voice conversations
+- Backend: FastAPI with SQLite database
+  - Voice session lifecycle management
+  - Health monitoring endpoints
+  - Session persistence and retrieval
+
+## Current Status
+
+### ✅ Working Features
+- **Voice Agent Core**: ElevenLabs ConvAI integration with WebSocket connections
+- **Session Management**: Backend FastAPI server with SQLite database  
+- **Voice Playground**: Basic voice conversation interface with agent selection
+- **Real-time Transcripts**: Live conversation display during calls
+- **Health Monitoring**: Both frontend (:3001) and backend (:8000) health endpoints
+- **Git Repository**: Successfully created at https://github.com/RekAlrasheed/Agentic-Navaia
+- **Development Environment**: Proper virtual environment setup with Python 3.12
+
+### 🚧 Critical Issues to Fix
+
+#### 1. Chat Interface Not Working
+- **Problem**: Clicking on chat doesn't initiate text conversation
+- **Impact**: Users cannot use text-based interaction with agents
+- **Priority**: High
+
+#### 2. Stop Call Function Broken  
+- **Problem**: Stop button doesn't actually terminate voice calls
+- **Impact**: Calls continue running even when user tries to end them
+- **Priority**: High
+
+#### 3. Call Summaries Missing
+- **Problem**: No post-call summary generation or analysis
+- **Impact**: No record of what was discussed or decided
+- **Priority**: Medium
+
+#### 4. Action Items Tracking
+- **Problem**: No system for extracting or tracking tickets, appointments, follow-ups
+- **Impact**: Manual work required to capture call outcomes
+- **Priority**: Medium
+
+#### 5. Call History Management
+- **Problem**: No persistent storage or display of previous calls with summaries
+- **Impact**: No way to review past conversations or their outcomes
+- **Priority**: Medium
+
+## Development Roadmap
+
+### Phase 1: Core Fixes (Immediate)
+**Branch: `feature/chat-interface`**
+- Fix chat interface functionality
+- Implement proper call termination
+- Enhance WebSocket connection management
+
+**Branch: `feature/call-termination`**  
+- Fix stop button functionality
+- Ensure proper cleanup of voice sessions
+- Add connection status indicators
+
+### Phase 2: Call Analytics (Next)
+**Branch: `feature/call-summaries`**
+- Post-call summary generation using AI
+- Extract key discussion points and decisions
+- Store summaries in database
+
+**Branch: `feature/action-items`**
+- Action items extraction (tickets, appointments, follow-ups)
+- Integration with ticket management system
+- Appointment scheduling capabilities
+
+### Phase 3: Call Management (Future)
+**Branch: `feature/call-history`**
+- Call list interface with summaries
+- Search and filter functionality
+- Call details view with full transcripts
+
+## Environment Configuration
+
+Required environment variables in `.env.local`:
+- `ELEVENLABS_API_KEY`: Your ElevenLabs API key
+- `ELEVENLABS_SUPPORT_AGENT_ID`: Support agent ID  
+- `ELEVENLABS_SALES_AGENT_ID`: Sales agent ID
+- `NEXT_PUBLIC_BACKEND_URL`: Backend server URL (http://localhost:8000)
+- `NEXT_PUBLIC_ELEVENLABS_SUPPORT_AGENT_ID`: Public support agent ID
+- `NEXT_PUBLIC_ELEVENLABS_SALES_AGENT_ID`: Public sales agent ID
+
+## Technical Implementation
+
+### Voice Agent Hook (`src/hooks/useVoiceAgent.ts`)
+- Uses `useConversation` from `@elevenlabs/react`
+- Manages WebSocket connections and microphone permissions
+- Handles real-time transcript processing
+- **Issues**: Chat functionality not implemented, stop function broken
+
+### API Routes
+- `/api/voice/sessions`: Session creation and management ✅
+- `/api/healthz`: Health monitoring ✅
+- `/api/logs`: Application logging ✅
+
+### Database Models
+- Voice sessions with customer tracking ✅
+- Call metadata and timestamps ✅
+- **Missing**: Call summaries, action items, chat logs
+
+## Testing & Deployment
+
+### Local Development
+1. Backend: `cd backend && .venv312/bin/python -m uvicorn app.main:app --reload --port 8000`
+2. Frontend: `npm run dev` (runs on :3001 if :3000 occupied)
+3. Health checks: Available via tasks in VS Code
+
+### Repository Structure
+- **Main Branch**: `master` (stable, production-ready)
+- **Development Branch**: `develop` (current working branch)
+- **Feature Branches**: Individual features developed separately before merging
+
+## Next Actions (No Permission Required)
+
+1. **Immediate**: Create `feature/chat-interface` branch and implement chat functionality
+2. **Immediate**: Create `feature/call-termination` branch and fix stop button
+3. **Next**: Implement call summary generation with AI analysis
+4. **Future**: Build comprehensive call management system
+
+## Branch Strategy
+- Each feature gets its own branch from `develop`
+- Features are tested independently before merging
+- Solid, working features merged back to `develop`
+- `develop` merged to `master` for releases
 
 ## Architecture (current)
 - Frontend: Next.js (App Router)
