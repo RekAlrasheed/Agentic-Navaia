@@ -94,6 +94,54 @@ A comprehensive voice agent platform built with Next.js and FastAPI, featuring r
    - Backend API: http://localhost:8000
    - Playground: http://localhost:3000/playground
 
+## 🚀 Deployment
+
+### Vercel Deployment (Recommended)
+
+This project is optimized for deployment on Vercel with automatic deployments from the `develop` branch.
+
+#### Quick Setup
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Run setup script
+./scripts/deploy-setup.sh
+```
+
+#### Manual Setup
+1. **Connect to Vercel**
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Import your GitHub repository
+   - Set production branch to `develop`
+
+2. **Environment Variables**
+   Add these in Vercel Dashboard → Settings → Environment Variables:
+   ```env
+   ELEVENLABS_API_KEY=your_api_key_here
+   ELEVENLABS_SUPPORT_AGENT_ID=your_support_agent_id
+   ELEVENLABS_SALES_AGENT_ID=your_sales_agent_id
+   NEXT_PUBLIC_BACKEND_URL=https://your-backend-url.com
+   NEXT_PUBLIC_ELEVENLABS_SUPPORT_AGENT_ID=your_support_agent_id
+   NEXT_PUBLIC_ELEVENLABS_SALES_AGENT_ID=your_sales_agent_id
+   ```
+
+3. **Deploy**
+   ```bash
+   # Deploy to production
+   npm run deploy
+   
+   # Deploy preview
+   npm run deploy:preview
+   ```
+
+#### Auto-Deploy from GitHub
+- Push to `develop` branch triggers automatic deployment
+- Pull requests create preview deployments
+- Production deployments from `develop` branch
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## 🧪 Testing
 
 ### Health Checks

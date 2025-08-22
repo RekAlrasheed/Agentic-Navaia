@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel"
   },
   "dependencies": {
     "@elevenlabs/react": "^0.5.1",

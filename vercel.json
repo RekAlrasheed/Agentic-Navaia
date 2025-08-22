@@ -1,0 +1,29 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["dub1"],
+  "env": {
+    "NEXT_PUBLIC_BACKEND_URL": "@backend_url",
+    "NEXT_PUBLIC_ELEVENLABS_SUPPORT_AGENT_ID": "@elevenlabs_support_agent_id",
+    "NEXT_PUBLIC_ELEVENLABS_SALES_AGENT_ID": "@elevenlabs_sales_agent_id"
+  },
+  "build": {
+    "env": {
+      "ELEVENLABS_API_KEY": "@elevenlabs_api_key"
+    }
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    }
+  ]
+}
