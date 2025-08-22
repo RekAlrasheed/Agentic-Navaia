@@ -1,0 +1,74 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "dev",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "lint",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"lint"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "test-health-endpoints",
+			"type": "shell",
+			"command": "curl -s http://127.0.0.1:8000/healthz && echo ' - Backend OK' && curl -s http://localhost:3001/api/healthz && echo ' - Next.js OK'",
+			"group": "test"
+		},
+		{
+			"label": "test-voice-session",
+			"type": "shell",
+			"command": "curl -s -X POST http://localhost:3001/api/voice/sessions -H 'Content-Type: application/json' -d '{\"agent_type\":\"support\",\"customer_id\":\"test-customer\"}' | jq .",
+			"group": "test"
+		},
+		{
+			"label": "test-voice-session-simple",
+			"type": "shell",
+			"command": "curl -s -X POST http://localhost:3001/api/voice/sessions -H 'Content-Type: application/json' -d '{\"agent_type\":\"support\",\"customer_id\":\"test-customer\"}'",
+			"group": "test"
+		}
+	]
+}

@@ -1,0 +1,38 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: navaia
+      POSTGRES_USER: navaia
+      POSTGRES_PASSWORD: navaia
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DB_URL: postgresql://navaia:navaia@postgres:5432/navaia
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: supersecretdevsecret
+      ELEVENLABS_HMAC_SECRET: dev-hmac-secret
+      TENANT_ID: demo-tenant
+      PYTHONPATH: /app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+volumes:
+  pgdata: 
