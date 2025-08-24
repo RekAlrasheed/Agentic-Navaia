@@ -13,11 +13,11 @@
   },
   "functions": {
     "src/app/api/**/*.ts": {
-      "runtime": "nodejs18.x",
+      "runtime": "vercel-nodejs@18.0.0",
       "maxDuration": 30
     },
     "api/backend/**/*.py": {
-      "runtime": "python3.9",
+      "runtime": "vercel-python@3.9.0",
       "maxDuration": 30
     }
   },
