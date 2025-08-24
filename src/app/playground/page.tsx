@@ -1,12 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { 
   Bot, 
   Phone, 
   MessageSquare, 
-  Play, 
-  Pause, 
   Mic, 
   MicOff,
   Send,
@@ -15,43 +13,75 @@ import {
   Volume2,
   VolumeX,
   Zap,
-  Target,
-  TrendingUp,
-  MapPin,
-  DollarSign,
   Calendar,
-  Home,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Headphones,
+  Activity,
+  PhoneOff,
+  Wifi,
+  WifiOff,
+  Battery,
+  Smartphone,
+  Tablet,
+  Monitor
 } from 'lucide-react'
-import { useAppStore } from '@/lib/store'
 import { useVoiceAgent } from '@/hooks/useVoiceAgent'
 
+interface Message {
+  id: string
+  type: 'user' | 'agent'
+  content: string
+  timestamp: Date
+  audioUrl?: string
+}
+
+const agentTypes = [
+  { 
+    id: 'support', 
+    name: 'دعم العملاء', 
+    description: 'مساعد خدمة العملاء',
+    color: 'from-blue-500 to-purple-600',
+    icon: User
+  },
+  { 
+    id: 'sales', 
+    name: 'المبيعات', 
+    description: 'مساعد المبيعات والتسويق',
+    color: 'from-green-500 to-emerald-600', 
+    icon: Zap
+  }
+]
+
 export default function PlaygroundPage() {
-  const [selectedPersona, setSelectedPersona] = useState<'support' | 'sales'>('support')
-  const [selectedMode, setSelectedMode] = useState<'voice' | 'chat'>('voice')
-  const [message, setMessage] = useState('')
-  const [conversation, setConversation] = useState<Array<{ role: 'user' | 'agent'; text: string; timestamp: Date }>>([])
-  const [extractedEntities, setExtractedEntities] = useState<any>({})
-  const [summary, setSummary] = useState('')
-  const [transcript, setTranscript] = useState('')
+  // States
+  const [mode, setMode] = useState<'voice' | 'chat'>('voice')
+  const [selectedAgent, setSelectedAgent] = useState(agentTypes[0])
+  const [isMuted, setIsMuted] = useState(false)
+  const [currentInput, setCurrentInput] = useState('')
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      type: 'agent',
+      content: 'مرحباً! أنا مساعدك الصوتي الذكي. كيف يمكنني مساعدتك اليوم؟',
+      timestamp: new Date()
+    }
+  ])
   const [error, setError] = useState<string | null>(null)
-  const [chatWidgetLoaded, setChatWidgetLoaded] = useState(false)
-  const [voiceWidgetLoaded, setVoiceWidgetLoaded] = useState(false)
+  const [transcript, setTranscript] = useState('')
   
-  const { simulateInboundCall, simulateInboundMessage } = useAppStore()
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [deviceType, setDeviceType] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
 
   // Initialize voice agent
   const {
-    isConnected,
+    startVoiceSession,
+    stopVoiceSession,
+    isConnected: voiceConnected,
     isListening,
     isSpeaking,
-    status,
-    currentSession,
-    startVoiceSession,
-    endVoiceSession,
-    startListening,
-    stopListening
+    status
   } = useVoiceAgent({
     onTranscript: (text, isFinal) => {
       setTranscript(text)
@@ -72,505 +102,543 @@ export default function PlaygroundPage() {
     }
   })
 
-  const personas = [
-    {
-      id: 'support',
-      name: 'دعم العملاء',
-      description: 'مساعدة العملاء في حل المشاكل والاستفسارات',
-      icon: '🛠️',
-      color: 'from-blue-500 to-indigo-600'
-    },
-    {
-      id: 'sales',
-      name: 'المبيعات',
-      description: 'مساعدة العملاء في العثور على العقار المناسب',
-      icon: '💰',
-      color: 'from-emerald-500 to-teal-600'
+  // Device detection
+  useEffect(() => {
+    const checkDevice = () => {
+      const width = window.innerWidth
+      if (width < 768) setDeviceType('mobile')
+      else if (width < 1024) setDeviceType('tablet')
+      else setDeviceType('desktop')
     }
-  ]
 
+    checkDevice()
+    window.addEventListener('resize', checkDevice)
+    return () => window.removeEventListener('resize', checkDevice)
+  }, [])
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Handlers
   const handleStartVoiceAgent = async () => {
-    if (isConnected) {
-      await endVoiceSession()
-  setVoiceWidgetLoaded(false)
+    if (voiceConnected) {
+      await stopVoiceSession()
     } else {
-  await startVoiceSession(selectedPersona)
+      await startVoiceSession(selectedAgent.id as 'support' | 'sales')
     }
   }
 
-  const handleMicrophoneToggle = () => {
-    if (isListening) {
-      stopListening()
-    } else {
-      startListening()
+  const handleEndCall = async () => {
+    try {
+      await stopVoiceSession()
+      // Add a brief success message
+      setError(null)
+    } catch (error: any) {
+      setError('فشل في إنهاء المكالمة: ' + (error.message || 'خطأ غير معروف'))
     }
   }
 
   const addMessage = (role: 'user' | 'agent', text: string) => {
-    const newMessage = {
-      role,
-      text,
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      type: role,
+      content: text,
       timestamp: new Date()
     }
-    setConversation(prev => [...prev, newMessage])
-    
-    if (role === 'user') {
-      setTimeout(() => {
-        simulateEntityExtraction(text)
-        simulateSummaryGeneration()
-      }, 500)
+    setMessages(prev => [...prev, newMessage])
+  }
+
+  const handleSendMessage = () => {
+    if (!currentInput.trim()) return
+
+    addMessage('user', currentInput)
+    setCurrentInput('')
+
+    // Simulate agent response
+    setTimeout(() => {
+      const responses = [
+        'شكراً لك على هذا السؤال. دعني أساعدك في ذلك.',
+        'ممتاز! هذا ما أحتاجه لمساعدتك بشكل أفضل.',
+        'أفهم طلبك. سأقوم بمعالجته الآن.',
+        'هذا رائع! هل تود أن أعرض عليك خيارات إضافية؟'
+      ]
+      const randomResponse = responses[Math.floor(Math.random() * responses.length)]
+      addMessage('agent', randomResponse)
+    }, 1000)
+  }
+
+  const getDeviceIcon = () => {
+    switch (deviceType) {
+      case 'mobile': return Smartphone
+      case 'tablet': return Tablet
+      default: return Monitor
     }
   }
 
-  const simulateEntityExtraction = (text: string) => {
-    const entities: any = {}
-    
-    if (text.includes('حي الملقا')) entities.neighborhood = 'حي الملقا'
-    if (text.includes('حي القيروان')) entities.neighborhood = 'حي القيروان'
-    if (text.includes('حي حطين')) entities.neighborhood = 'حي حطين'
-    
-    if (text.includes('شقة')) entities.propertyType = 'شقة'
-    if (text.includes('فيلا')) entities.propertyType = 'فيلا'
-    
-    if (text.includes('غرفتين')) entities.bedrooms = 2
-    if (text.includes('3 غرف')) entities.bedrooms = 3
-    if (text.includes('4 غرف')) entities.bedrooms = 4
-    
-    if (text.includes('كهرباء')) entities.issue = 'كهرباء'
-    if (text.includes('سباكة')) entities.issue = 'سباكة'
-    if (text.includes('مفاتيح')) entities.issue = 'مفاتيح'
-    
-    if (text.includes('10,000') || text.includes('10000')) entities.budget = 10000
-    if (text.includes('12,000') || text.includes('12000')) entities.budget = 12000
-    if (text.includes('15,000') || text.includes('15000')) entities.budget = 15000
-    
-    setExtractedEntities(entities)
-  }
-
-  const simulateSummaryGeneration = () => {
-    const summaries = [
-      'عميل يبحث عن شقة في حي الملقا بميزانية 12,000 ريال شهرياً',
-      'عميل يعاني من مشكلة في الكهرباء ويحتاج إلى فتح تذكرة صيانة',
-      'عميلة تبحث عن شقة بغرفتين نوم مفروشة في حي حطين',
-      'عميل مهتم بتجديد العقد الحالي'
-    ]
-    
-    setSummary(summaries[Math.floor(Math.random() * summaries.length)])
-  }
-
-  const sendMessage = () => {
-    if (message.trim()) {
-      addMessage('user', message)
-      setMessage('')
-      
-      // Simulate AI response
-      setTimeout(() => {
-        const responses = [
-          'شكراً لك على هذا السؤال. دعني أساعدك في ذلك.',
-          'ممتاز! هذا ما أحتاجه لمساعدتك بشكل أفضل.',
-          'أفهم طلبك. سأقوم بمعالجته الآن.',
-          'هذا رائع! هل تود أن أعرض عليك خيارات إضافية؟'
-        ]
-        
-        const randomResponse = responses[Math.floor(Math.random() * responses.length)]
-        addMessage('agent', randomResponse)
-      }, 1000)
-    }
-  }
-
-  const clearConversation = () => {
-    setConversation([])
-    setExtractedEntities({})
-    setSummary('')
-  }
-
-  const createBooking = () => {
-    alert('تم إنشاء الحجز بنجاح!')
-  }
-
-  const createTicket = () => {
-    alert('تم فتح التذكرة بنجاح!')
-  }
-
-  const sendWhatsApp = () => {
-    alert('تم إرسال رسالة الواتساب!')
-  }
-
-  const loadChatWidget = () => {
-    const agentId = selectedPersona === 'support' ? 
-      process.env.NEXT_PUBLIC_ELEVENLABS_SUPPORT_AGENT_ID : 
-      process.env.NEXT_PUBLIC_ELEVENLABS_SALES_AGENT_ID
-
-    if (!agentId) {
-      setError('Agent ID not found')
-      return
-    }
-
-    // Clear any existing widget
-    const existingWidget = document.getElementById('elevenlabs-chat-widget')
-    if (existingWidget) {
-      existingWidget.remove()
-    }
-
-    // Create new script element
-    const script = document.createElement('script')
-    script.src = 'https://elevenlabs.io/convai-widget/index.js'
-    script.id = 'elevenlabs-chat-widget'
-  script.onload = () => {
-      // Initialize the widget after script loads
-      if ((window as any).ElevenLabsConvAI) {
-        (window as any).ElevenLabsConvAI.init({
-          agentId: agentId,
-          onConnect: () => {
-            console.log('ElevenLabs chat connected')
-            setChatWidgetLoaded(true)
-      fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:chat', level: 'info', message: 'connected' }) }).catch(() => {})
-          },
-          onDisconnect: () => {
-            console.log('ElevenLabs chat disconnected')
-      fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:chat', level: 'info', message: 'disconnected' }) }).catch(() => {})
-          },
-          onMessage: (message: any) => {
-            console.log('ElevenLabs message:', message)
-      fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:chat', level: 'info', message: 'message', meta: { message } }) }).catch(() => {})
-          },
-          onError: (error: any) => {
-            console.error('ElevenLabs chat error:', error)
-            setError('Chat connection failed')
-      fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:chat', level: 'error', message: 'error', meta: { error: String(error) } }) }).catch(() => {})
-          }
-        })
-      }
-    }
-    
-    document.head.appendChild(script)
-  }
-
-  const loadVoiceWidget = () => {
-    const agentId = selectedPersona === 'support' ? 
-      process.env.NEXT_PUBLIC_ELEVENLABS_SUPPORT_AGENT_ID : 
-      process.env.NEXT_PUBLIC_ELEVENLABS_SALES_AGENT_ID
-
-    if (!agentId) {
-      setError('Agent ID not found for voice')
-      return
-    }
-
-    // If script already exists, just init
-    const existingScript = document.getElementById('elevenlabs-voice-widget') as HTMLScriptElement | null
-  const initWidget = () => {
-      const w: any = (window as any)
-      if (w.ElevenLabsConvAI) {
-        try {
-          w.ElevenLabsConvAI.init({
-            agentId,
-            // Some widgets auto-render a floating button; this ensures it's ready
-            onConnect: () => {
-              console.log('ElevenLabs voice connected')
-              setVoiceWidgetLoaded(true)
-        fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:voice', level: 'info', message: 'connected' }) }).catch(() => {})
-            },
-            onDisconnect: () => {
-              console.log('ElevenLabs voice disconnected')
-              setVoiceWidgetLoaded(false)
-        fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:voice', level: 'info', message: 'disconnected' }) }).catch(() => {})
-            },
-            onError: (err: any) => {
-              console.error('ElevenLabs voice error:', err)
-              setError('Voice connection failed')
-        fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:voice', level: 'error', message: 'error', meta: { error: String(err) } }) }).catch(() => {})
-            },
-          })
-        } catch (e) {
-          console.error('Init voice widget failed:', e)
-          setError('Voice init failed')
-      fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:voice', level: 'error', message: 'init_failed', meta: { error: String(e) } }) }).catch(() => {})
-        }
-      }
-    }
-
-    if (existingScript) {
-      initWidget()
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = 'https://elevenlabs.io/convai-widget/index.js'
-    script.id = 'elevenlabs-voice-widget'
-    script.onload = initWidget
-  script.onerror = () => { setError('Failed to load voice widget'); fetch('/api/logs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'widget:voice', level: 'error', message: 'script_load_failed' }) }).catch(() => {}) }
-    document.head.appendChild(script)
-  }
+  const DeviceIcon = getDeviceIcon()
 
   return (
-    <div className="min-h-screen gradient-bg p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-3 sm:p-4 lg:p-8">
       <div className="max-w-7xl mx-auto">
+        {/* Mobile Status Bar */}
+        <div className="lg:hidden mb-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl p-4 border border-white/20 dark:border-slate-700/20 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 space-x-reverse">
+              <div className={`w-3 h-3 rounded-full ${voiceConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                {voiceConnected ? 'متصل' : 'غير متصل'}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2 space-x-reverse">
+              <DeviceIcon className="w-4 h-4 text-slate-500" />
+              <span className="text-xs text-slate-500 capitalize">{deviceType}</span>
+            </div>
+            <div className="flex items-center space-x-2 space-x-reverse">
+              {voiceConnected ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-500" />
+              )}
+              <Battery className="w-4 h-4 text-slate-500" />
+            </div>
+          </div>
+        </div>
+
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-100">
-            ساحة تجربة الوكيل
+        <div className="mb-6 lg:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-2">
+            ساحة التجربة
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">
-            اختبر المساعد الصوتي الذكي مع شخصيات مختلفة
+          <p className="text-slate-600 dark:text-slate-400 text-sm lg:text-base">
+            اختبر قدرات المساعد الصوتي الذكي بالذكاء الاصطناعي
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel - Mode and Persona Selection */}
-          <div className="space-y-6">
-            {/* Mode Selection */}
-            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-white/20 dark:border-slate-700/20">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                اختر نوع التفاعل
-              </h3>
-              <div className="space-y-3">
-                {[
-                  {
-                    id: 'voice',
-                    name: 'المحادثة الصوتية',
-                    description: 'تحدث مباشرة مع الوكيل الذكي',
-                    icon: '🎤',
-                  },
-                  {
-                    id: 'chat',
-                    name: 'المحادثة النصية',
-                    description: 'اكتب رسائل مع الوكيل الذكي',
-                    icon: '💬',
-                  }
-                ].map((mode) => (
-                  <button
-                    key={mode.id}
-                    onClick={() => setSelectedMode(mode.id as 'voice' | 'chat')}
-                    className={`w-full p-4 rounded-xl text-right transition-all duration-200 ${
-                      selectedMode === mode.id
-                        ? 'bg-blue-500 text-white shadow-lg'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{mode.icon}</span>
-                      <div>
-                        <div className="font-medium">{mode.name}</div>
-                        <div className="text-sm opacity-80">{mode.description}</div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Persona Selection */}
-            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-white/20 dark:border-slate-700/20">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                اختر شخصية الوكيل
-              </h3>
-              <div className="space-y-3">
-                {personas.map((persona) => (
-                  <button
-                    key={persona.id}
-                    onClick={() => {
-                      setSelectedPersona(persona.id as 'support' | 'sales')
-                      if (chatWidgetLoaded) {
-                        setChatWidgetLoaded(false)
-                      }
-                    }}
-                    className={`w-full p-4 rounded-xl text-right transition-all duration-200 ${
-                      selectedPersona === persona.id
-                        ? `bg-gradient-to-r ${persona.color} text-white shadow-lg`
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{persona.icon}</span>
-                      <div>
-                        <div className="font-medium">{persona.name}</div>
-                        <div className="text-sm opacity-80">{persona.description}</div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Middle Panel - Voice/Chat Interface */}
-          <div className="lg:col-span-2">
-            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-white/20 dark:border-slate-700/20 h-full">
-              {selectedMode === 'voice' ? (
-                <div className="space-y-6">
-                  {/* Voice Controls */}
-                  <div className="text-center space-y-4">
-                    <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                      المحادثة الصوتية
-                    </h3>
-                    
-                    {/* Connection Status */}
-                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm ${
-                      isConnected ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${
-                        isConnected ? 'bg-green-500 animate-pulse' : 'bg-slate-400'
-                      }`} />
-                      {isConnected ? 'متصل' : 'غير متصل'}
-                    </div>
-
-                    {/* Voice Connection Button */}
-                    <div className="flex flex-col items-center gap-4">
-                      <button
-                        onClick={handleStartVoiceAgent}
-                        disabled={status === 'connecting'}
-                        className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200 ${
-                          isConnected 
-                            ? 'bg-red-500 hover:bg-red-600 text-white' 
-                            : 'bg-blue-500 hover:bg-blue-600 text-white'
-                        } ${status === 'connecting' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {status === 'connecting' ? (
-                          <Loader2 className="w-8 h-8 animate-spin" />
-                        ) : isConnected ? (
-                          <Phone className="w-8 h-8" />
-                        ) : (
-                          <Phone className="w-8 h-8" />
-                        )}
-                      </button>
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {isConnected ? 'اضغط لإنهاء المكالمة' : 'اضغط للاتصال'}
-                      </span>
-                    </div>
-
-                    {/* Microphone Controls */}
-                    {isConnected && (
-                      <div className="flex flex-col items-center gap-2 mt-6">
-                        <button
-                          onClick={handleMicrophoneToggle}
-                          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
-                            isListening 
-                              ? 'bg-red-500 text-white animate-pulse' 
-                              : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                          }`}
-                        >
-                          {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-                        </button>
-                        <span className="text-xs text-slate-500">
-                          {isListening ? 'يتم الاستماع...' : 'اضغط للتحدث'}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Speaking Indicator */}
-                    {isSpeaking && (
-                      <div className="flex items-center gap-2 justify-center">
-                        <Volume2 className="w-5 h-5 text-blue-500" />
-                        <span className="text-sm text-blue-600">الوكيل يتحدث...</span>
-                      </div>
-                    )}
-
-                    {/* Voice Transcript */}
-                    {transcript && (
-                      <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
-                          "{transcript}"
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Chat Interface */}
-                  <div className="text-center space-y-4">
-                    <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                      المحادثة النصية
-                    </h3>
-                    
-                    {!chatWidgetLoaded ? (
-                      <button
-                        onClick={loadChatWidget}
-                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors"
-                      >
-                        بدء المحادثة النصية
-                      </button>
-                    ) : (
-                      <div className="h-96 border border-slate-200 dark:border-slate-700 rounded-lg">
-                        <div id="elevenlabs-convai-widget-container" className="w-full h-full"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button
-            onClick={createBooking}
-            className="bg-green-500 hover:bg-green-600 text-white p-4 rounded-xl transition-colors flex items-center gap-3"
-          >
-            <Calendar className="w-6 h-6" />
-            إنشاء حجز
-          </button>
-          <button
-            onClick={createTicket}
-            className="bg-orange-500 hover:bg-orange-600 text-white p-4 rounded-xl transition-colors flex items-center gap-3"
-          >
-            <AlertCircle className="w-6 h-6" />
-            فتح تذكرة
-          </button>
-          <button
-            onClick={sendWhatsApp}
-            className="bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl transition-colors flex items-center gap-3"
-          >
-            <MessageSquare className="w-6 h-6" />
-            إرسال واتساب
-          </button>
-        </div>
-
-        {/* Conversation History */}
-        {conversation.length > 0 && (
-          <div className="mt-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-6 border border-white/20 dark:border-slate-700/20">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                سجل المحادثة
-              </h3>
+        {/* Mobile Mode Switcher */}
+        <div className="lg:hidden mb-6">
+          <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-4 border border-white/20 dark:border-slate-700/20 shadow-lg">
+            <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={clearConversation}
-                className="text-red-500 hover:text-red-700 text-sm"
+                onClick={() => setMode('voice')}
+                className={`flex items-center justify-center gap-3 p-4 rounded-xl font-medium transition-all duration-300 active:scale-95 touch-manipulation ${
+                  mode === 'voice'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+                }`}
               >
-                مسح السجل
+                <Headphones className="w-5 h-5" />
+                <span className="text-sm">صوتية</span>
+              </button>
+              <button
+                onClick={() => setMode('chat')}
+                className={`flex items-center justify-center gap-3 p-4 rounded-xl font-medium transition-all duration-300 active:scale-95 touch-manipulation ${
+                  mode === 'chat'
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25'
+                    : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
+                }`}
+              >
+                <MessageSquare className="w-5 h-5" />
+                <span className="text-sm">نصية</span>
               </button>
             </div>
+          </div>
+        </div>
 
-            {/* Messages */}
-            <div className="space-y-4 mb-4 max-h-96 overflow-y-auto">
-              {conversation.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md p-3 rounded-2xl ${
-                      msg.role === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100'
+        {/* Mobile Agent Switcher */}
+        <div className="lg:hidden mb-6">
+          <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-4 border border-white/20 dark:border-slate-700/20 shadow-lg">
+            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+              اختر نوع المساعد
+            </h3>
+            <div className="grid grid-cols-1 gap-3">
+              {agentTypes.map((agent) => {
+                const IconComponent = agent.icon
+                return (
+                  <button
+                    key={agent.id}
+                    onClick={() => setSelectedAgent(agent)}
+                    className={`flex items-center space-x-3 space-x-reverse p-4 rounded-xl transition-all duration-300 active:scale-95 touch-manipulation ${
+                      selectedAgent.id === agent.id
+                        ? `bg-gradient-to-r ${agent.color} text-white shadow-lg`
+                        : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700'
                     }`}
                   >
-                    <p>{msg.text}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {msg.timestamp.toLocaleTimeString('ar-SA')}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      selectedAgent.id === agent.id
+                        ? 'bg-white/20'
+                        : 'bg-gray-100 dark:bg-slate-700'
+                    }`}>
+                      <IconComponent className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 text-right">
+                      <div className="font-medium text-sm">{agent.name}</div>
+                      <div className={`text-xs ${
+                        selectedAgent.id === agent.id ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+                      }`}>
+                        {agent.description}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+          {/* Desktop Sidebar - Hidden on Mobile */}
+          <div className="hidden lg:block lg:col-span-1 space-y-6">
+            {/* Mode Selector */}
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-6 border border-white/20 dark:border-slate-700/20 shadow-lg">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                نوع المحادثة
+              </h3>
+              <div className="space-y-3">
+                <button
+                  onClick={() => setMode('voice')}
+                  className={`w-full flex items-center space-x-3 space-x-reverse p-4 rounded-xl transition-all duration-300 ${
+                    mode === 'voice'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/25'
+                      : 'border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Headphones className="w-5 h-5" />
+                  <span className="font-medium">المحادثة الصوتية</span>
+                </button>
+                <button
+                  onClick={() => setMode('chat')}
+                  className={`w-full flex items-center space-x-3 space-x-reverse p-4 rounded-xl transition-all duration-300 ${
+                    mode === 'chat'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25'
+                      : 'border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  <span className="font-medium">المحادثة النصية</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Agent Selector */}
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-6 border border-white/20 dark:border-slate-700/20 shadow-lg">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                نوع المساعد
+              </h3>
+              <div className="space-y-3">
+                {agentTypes.map((agent) => {
+                  const IconComponent = agent.icon
+                  return (
+                    <button
+                      key={agent.id}
+                      onClick={() => setSelectedAgent(agent)}
+                      className={`w-full flex items-center space-x-3 space-x-reverse p-4 rounded-xl transition-all duration-300 ${
+                        selectedAgent.id === agent.id
+                          ? `bg-gradient-to-r ${agent.color} text-white shadow-lg`
+                          : 'border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        selectedAgent.id === agent.id
+                          ? 'bg-white/20'
+                          : 'bg-gray-100 dark:bg-slate-700'
+                      }`}>
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 text-right">
+                        <div className="font-medium">{agent.name}</div>
+                        <div className={`text-sm ${
+                          selectedAgent.id === agent.id ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {agent.description}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Connection Status */}
+            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-6 border border-white/20 dark:border-slate-700/20 shadow-lg">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                حالة الاتصال
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 space-x-reverse">
+                  <div className={`w-3 h-3 rounded-full ${voiceConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    {voiceConnected ? 'متصل بالخادم' : 'غير متصل'}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3 space-x-reverse">
+                  <Bot className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                    AI جاهز للعمل
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3 space-x-reverse">
+                  <DeviceIcon className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm text-slate-600 dark:text-slate-400 capitalize">
+                    {deviceType} Device
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Interface */}
+          <div className="lg:col-span-3">
+            {mode === 'voice' ? (
+              // Voice Interface
+              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-4 sm:p-6 lg:p-8 border border-white/20 dark:border-slate-700/20 shadow-lg min-h-[500px] sm:min-h-[600px] flex flex-col">
+                <div className="text-center mb-6 sm:mb-8">
+                  <div className={`w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mx-auto mb-4 rounded-full bg-gradient-to-r ${selectedAgent.color} flex items-center justify-center shadow-lg`}>
+                    <selectedAgent.icon className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-white" />
+                  </div>
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                    {selectedAgent.name}
+                  </h2>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base">
+                    {selectedAgent.description}
+                  </p>
+                </div>
+
+                {/* Voice Controls */}
+                <div className="flex-1 flex flex-col items-center justify-center space-y-6 lg:space-y-8">
+                  <div className="relative">
+                    <button
+                      onClick={handleStartVoiceAgent}
+                      disabled={status === 'connecting'}
+                      className={`w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-2xl transition-all duration-300 active:scale-90 focus:outline-none focus:ring-4 focus:ring-blue-500/30 touch-manipulation ${
+                        voiceConnected
+                          ? 'bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
+                          : status === 'connecting'
+                            ? 'bg-gradient-to-br from-gray-400 to-gray-500 cursor-not-allowed'
+                            : 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
+                      }`}
+                    >
+                      {status === 'connecting' ? (
+                        <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 animate-spin" />
+                      ) : voiceConnected ? (
+                        <PhoneOff className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12" />
+                      ) : (
+                        <Phone className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12" />
+                      )}
+                    </button>
+                    
+                    {voiceConnected && (
+                      <div className="absolute -inset-4 border-2 border-red-500 rounded-full animate-ping" />
+                    )}
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-base sm:text-lg font-medium text-slate-700 dark:text-slate-300">
+                      {status === 'connecting' ? 'جاري الاتصال...' :
+                       voiceConnected ? 'المكالمة نشطة - انقر الزر الأحمر أدناه لإنهاء المكالمة' : 'انقر لبدء المكالمة'}
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      {voiceConnected ? 'يمكنك التحدث الآن أو استخدام الأزرار أدناه للتحكم' : 'تأكد من تشغيل الميكروفون'}
+                    </p>
+                  </div>
+
+                  {/* Voice Status Indicators */}
+                  {voiceConnected && (
+                    <div className="space-y-4 w-full max-w-md">
+                      {isListening && (
+                        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/30 rounded-2xl border border-red-200 dark:border-red-700">
+                          <Mic className="w-6 h-6 text-red-500 animate-pulse" />
+                          <div className="text-red-700 dark:text-red-300">
+                            <p className="font-medium">يتم الاستماع</p>
+                            <p className="text-sm opacity-75">تحدث الآن</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {isSpeaking && (
+                        <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-2xl border border-blue-200 dark:border-blue-700">
+                          <Volume2 className="w-6 h-6 text-blue-500 animate-bounce" />
+                          <div className="text-blue-700 dark:text-blue-300">
+                            <p className="font-medium">الوكيل يتحدث</p>
+                            <p className="text-sm opacity-75">استمع للرد</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {transcript && (
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-2xl border border-blue-200 dark:border-blue-700">
+                          <div className="flex items-start gap-3">
+                            <Mic className="w-5 h-5 text-blue-500 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                يتم التحويل...
+                              </p>
+                              <p className="text-blue-800 dark:text-blue-200 leading-relaxed text-sm">
+                                "{transcript}"
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Voice Action Buttons */}
+                  {voiceConnected ? (
+                    // Connected Call Controls
+                    <div className="space-y-4 w-full max-w-lg">
+                      {/* End Call Button - Prominent */}
+                      <button
+                        onClick={handleEndCall}
+                        className="w-full p-4 rounded-xl bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation flex items-center justify-center gap-3"
+                      >
+                        <PhoneOff className="w-6 h-6" />
+                        <span className="font-medium text-lg">إنهاء المكالمة</span>
+                      </button>
+                      
+                      {/* Call Control Actions */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <button
+                          onClick={() => setIsMuted(!isMuted)}
+                          className={`p-3 sm:p-4 rounded-xl transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation ${
+                            isMuted 
+                              ? 'bg-gradient-to-br from-red-400 to-red-500 text-white' 
+                              : 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
+                          }`}
+                        >
+                          {isMuted ? <VolumeX className="w-5 h-5 mx-auto" /> : <Volume2 className="w-5 h-5 mx-auto" />}
+                          <span className="block text-xs mt-2">{isMuted ? 'إلغاء كتم' : 'كتم'}</span>
+                        </button>
+
+                        <button className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation">
+                          <Settings className="w-5 h-5 mx-auto" />
+                          <span className="block text-xs mt-2">إعدادات</span>
+                        </button>
+
+                        <button className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation">
+                          <Activity className="w-5 h-5 mx-auto" />
+                          <span className="block text-xs mt-2">تحليل</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Disconnected Default Actions
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 w-full max-w-lg">
+                      <button className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-green-500 to-green-600 text-white transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation">
+                        <Calendar className="w-5 h-5 mx-auto" />
+                        <span className="block text-xs mt-2">حجز</span>
+                      </button>
+
+                      <button
+                        onClick={() => setIsMuted(!isMuted)}
+                        className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation"
+                      >
+                        {isMuted ? <VolumeX className="w-5 h-5 mx-auto" /> : <Volume2 className="w-5 h-5 mx-auto" />}
+                        <span className="block text-xs mt-2">{isMuted ? 'صوت' : 'كتم'}</span>
+                      </button>
+
+                      <button className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 text-white transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation">
+                        <Settings className="w-5 h-5 mx-auto" />
+                        <span className="block text-xs mt-2">إعدادات</span>
+                      </button>
+
+                      <button className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white transition-all duration-300 hover:shadow-lg active:scale-95 touch-manipulation">
+                        <Activity className="w-5 h-5 mx-auto" />
+                        <span className="block text-xs mt-2">تحليل</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Chat Interface
+              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl border border-white/20 dark:border-slate-700/20 shadow-lg h-[500px] sm:h-[600px] lg:h-[700px] flex flex-col">
+                {/* Chat Header */}
+                <div className="p-4 sm:p-6 border-b border-white/20 dark:border-slate-700/20">
+                  <div className="flex items-center space-x-3 space-x-reverse">
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-r ${selectedAgent.color} flex items-center justify-center shadow-lg`}>
+                      <selectedAgent.icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-900 dark:text-white">
+                        {selectedAgent.name}
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        متصل الآن
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-xs text-green-600 dark:text-green-400">نشط</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.type === 'user' ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] sm:max-w-[75%] lg:max-w-[70%] p-3 sm:p-4 rounded-2xl shadow-md ${
+                          message.type === 'user'
+                            ? 'bg-blue-500 text-white ml-2'
+                            : 'bg-gray-100 dark:bg-slate-800 text-slate-900 dark:text-white mr-2'
+                        }`}
+                      >
+                        <p className="text-sm sm:text-base leading-relaxed">{message.content}</p>
+                        <p className={`text-xs mt-2 ${
+                          message.type === 'user' ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'
+                        }`}>
+                          {message.timestamp.toLocaleTimeString('ar-SA', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Chat Input */}
+                <div className="p-4 sm:p-6 border-t border-white/20 dark:border-slate-700/20">
+                  <div className="flex space-x-3 space-x-reverse">
+                    <input
+                      type="text"
+                      value={currentInput}
+                      onChange={(e) => setCurrentInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                      placeholder="اكتب رسالتك هنا..."
+                      className="flex-1 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base touch-manipulation"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      className="p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all duration-300 active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500/50 touch-manipulation"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Error Display */}
         {error && (
-          <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            {error}
+          <div className="mt-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 sm:px-6 py-4 rounded-2xl shadow-lg">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 shrink-0" />
+              <div>
+                <p className="font-medium">حدث خطأ</p>
+                <p className="text-sm opacity-90">{error}</p>
+              </div>
+            </div>
           </div>
         )}
       </div>

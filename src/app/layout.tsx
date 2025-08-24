@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Tajawal } from 'next/font/google'
 import '@/styles/globals.css'
 import ThemeToggle from '@/components/ThemeToggle'
-import Sidebar from '@/components/Sidebar'
+import ClientLayout from '@/components/ClientLayout'
 
 const tajawal = Tajawal({ subsets: ['arabic'], weight: ['400','500','700','800'] })
 
@@ -19,12 +19,9 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body className={`${tajawal.className} bg-background text-foreground`}>
-        <div id="__app" className="min-h-screen flex">
-          <Sidebar />
-          <main className="flex-1 mr-80">
-            {children}
-          </main>
-        </div>
+        <ClientLayout>
+          {children}
+        </ClientLayout>
         <ThemeToggle />
       </body>
     </html>
