@@ -5,7 +5,7 @@ const nextConfig = {
     serverComponentsExternalPackages: ['@elevenlabs/react'],
   },
   env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
+    CUSTOM_KEY: process.env.CUSTOM_KEY || 'default-value',
   },
   async headers() {
     return [
