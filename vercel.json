@@ -1,16 +1,6 @@
 {
   "framework": "nextjs",
   "regions": ["iad1"],
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "runtime": "vercel-nodejs@18.0.0",
-      "maxDuration": 30
-    },
-    "api/backend/**/*.py": {
-      "runtime": "vercel-python@3.9.0",
-      "maxDuration": 30
-    }
-  },
   "env": {
     "ELEVENLABS_API_KEY": "sk_689820c907accdc0f6cb0ab06aadded1244f59ba49e9a3ce",
     "ELEVENLABS_SUPPORT_AGENT_ID": "agent_5701k2pjsar8f4gvz6ynd7ks5p5s",
