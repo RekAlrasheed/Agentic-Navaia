@@ -1,25 +1,24 @@
 {
-  "framework": "nextjs",
-  "regions": ["iad1"],
-  "buildCommand": "npm run build",
-  "installCommand": "npm install && pip install -r backend/requirements.txt",
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/app/api/**/*.ts",
+      "use": "@vercel/node",
+      "runtime": "vercel-nodejs@18.0.0"
+    },
+    {
+      "src": "api/backend/**/*.py",
+      "use": "@vercel/python",
+      "runtime": "vercel-python@3.9.0"
+    }
+  ],
   "env": {
     "ELEVENLABS_API_KEY": "sk_689820c907accdc0f6cb0ab06aadded1244f59ba49e9a3ce",
-    "ELEVENLABS_SUPPORT_AGENT_ID": "agent_5701k2pjsar8f4gvz6ynd7ks5p5s", 
+    "ELEVENLABS_SUPPORT_AGENT_ID": "agent_5701k2pjsar8f4gvz6ynd7ks5p5s",
     "ELEVENLABS_SALES_AGENT_ID": "agent_9401k2pkqd9vfwz9p0p06eddj31f",
     "NEXT_PUBLIC_BACKEND_URL": "https://navaiavoiceportal.vercel.app",
     "NEXT_PUBLIC_ELEVENLABS_SUPPORT_AGENT_ID": "agent_5701k2pjsar8f4gvz6ynd7ks5p5s",
     "NEXT_PUBLIC_ELEVENLABS_SALES_AGENT_ID": "agent_9401k2pkqd9vfwz9p0p06eddj31f"
-  },
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "runtime": "vercel-nodejs@18.0.0",
-      "maxDuration": 30
-    },
-    "api/backend/**/*.py": {
-      "runtime": "vercel-python@3.9.0",
-      "maxDuration": 30
-    }
   },
   "redirects": [
     {
